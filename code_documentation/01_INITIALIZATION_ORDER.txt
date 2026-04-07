@@ -1,0 +1,109 @@
+================================================================================
+INITIALIZATION ORDER & STARTUP SEQUENCE
+================================================================================
+
+This document shows the exact order in which code executes when the app starts.
+
+STEP 1: HTML LOADS
+------------------
+index.html loads script files in this order:
+  1. wrappedgl.js       - WebGL wrapper utilities
+  2. utilities.js       - Math/vector utilities
+  3. camera.js          - Camera controls
+  4. boxeditor.js       - Box editing interface
+  5. simulator.js       - Fluid simulation logic
+  6. renderer.js        - Rendering pipeline
+  7. simulatorrenderer.js - Combines simulator + renderer
+  8. slider.js          - UI slider component
+  9. fluidparticles.js  - Main application controller
+
+STEP 2: WEBGL CHECK
+-------------------
+index.html line 176:
+  WrappedGL.checkWebGLSupportWithExtensions([...], successCallback, failureCallback)
+  
+  If WebGL supported:
+    → Inserts main template HTML
+    → Calls: new FluidParticles()
+
+STEP 3: FLUIDPARTICLES CONSTRUCTOR
+-----------------------------------
+fluidparticles.js line 13: function FluidParticles()
+
+  Order of initialization:
+    1. Get canvas element (line 15)
+    2. Create WrappedGL instance (line 16)
+       → Sets up WebGL context and state management
+    3. Set grid dimensions (lines 20-22)
+    4. Create projection matrix (line 24)
+    5. Create Camera instance (line 25)
+       → Sets up orbit point, distance, azimuth, elevation
+    6. Create BoxEditor instance (line 31)
+       → Loads shader programs asynchronously
+       → Calls onLoaded callback when ready
+    7. Create SimulatorRenderer instance (line 42)
+       → Creates Renderer (loads shaders async)
+       → Creates Simulator (loads shaders async)
+       → Calls onLoaded callback when BOTH ready
+
+STEP 4: ASYNC SHADER LOADING
+-----------------------------
+Both BoxEditor and SimulatorRenderer load shaders asynchronously:
+
+  BoxEditor (boxeditor.js):
+    - backgroundProgram
+    - boxProgram
+    - boxWireframeProgram
+    - gridProgram
+    - pointProgram
+    → When all loaded: boxEditorLoaded = true
+
+  SimulatorRenderer (simulatorrenderer.js):
+    - Renderer loads: sphereProgram, sphereDepthProgram, sphereAOProgram,
+                      compositeProgram, fxaaProgram
+    - Simulator loads: transferToGridProgram, normalizeGridProgram, markProgram,
+                       addForceProgram, enforceBoundariesProgram, extendVelocityProgram,
+                       transferToParticlesProgram, divergenceProgram, jacobiProgram,
+                       subtractProgram, advectProgram, copyProgram
+    → When BOTH loaded: simulatorRendererLoaded = true
+
+STEP 5: START FUNCTION CALLED
+-------------------------------
+When BOTH BoxEditor AND SimulatorRenderer are loaded:
+  → start() function called (fluidparticles.js line 49)
+
+  start() does:
+    1. Set state to EDITING (line 50)
+    2. Set up UI button event listeners (lines 55-73)
+    3. Set up preset button (lines 98-114)
+    4. Set up color preset bar (lines 117-195)
+    5. Set up all sliders (lines 205-288)
+    6. Set up effect toggles (lines 274-283, within slider setup)
+    7. Set up debug menu (lines 326-367)
+    8. Set up mouse/keyboard event listeners (lines 372-380)
+    9. Call redrawUI() (lines 385-389)
+    10. Click preset button to load initial preset (line 322)
+    11. Start animation loop (lines 394-423)
+
+STEP 6: ANIMATION LOOP STARTS
+------------------------------
+requestAnimationFrame loop (fluidparticles.js line 395):
+
+  Every frame:
+    1. Calculate deltaTime
+    2. Track FPS (runs every frame, display update conditional)
+    3. Update camera (this.camera.update())
+    4. Call this.update(deltaTime)
+       → If EDITING: this.boxEditor.draw()
+       → If SIMULATING: this.simulatorRenderer.update(dt)
+    5. Request next frame
+
+CRITICAL DEPENDENCIES:
+----------------------
+- FluidParticles CANNOT start until BOTH BoxEditor AND SimulatorRenderer
+  shaders are loaded (async callbacks)
+- start() function sets up ALL UI and event handlers
+- Animation loop only starts after start() completes
+- First frame renders after preset button is clicked (loads initial boxes)
+
+================================================================================

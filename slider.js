@@ -13,6 +13,8 @@ var Slider = (function () {
 
         this.innerDiv = document.createElement('div');
         this.innerDiv.style.position = 'absolute';
+        this.innerDiv.style.left = '0';
+        this.innerDiv.style.top = '0';
         this.innerDiv.style.height = this.div.offsetHeight + 'px';
 
         this.div.appendChild(this.innerDiv);
@@ -40,10 +42,17 @@ var Slider = (function () {
 
     };
 
-    Slider.prototype.redraw = function () {
+    Slider.prototype.redraw = function (isRetry) {
         var fraction = (this.value - this.min) / (this.max - this.min);
-        this.innerDiv.style.width = fraction * this.div.offsetWidth + 'px';
-        this.innerDiv.style.height = this.div.offsetHeight + 'px';
+        var w = this.div.offsetWidth;
+        var h = this.div.offsetHeight;
+        if ((w === 0 || h === 0) && !isRetry) {
+            var self = this;
+            requestAnimationFrame(function () { self.redraw(true); });
+            return;
+        }
+        this.innerDiv.style.width = (fraction * w) + 'px';
+        this.innerDiv.style.height = h + 'px';
     }
 
     Slider.prototype.onChange = function (event) {

@@ -160,10 +160,12 @@ var BoxEditor = (function () {
     //the grid starts at (0, 0, 0)
     //gridSize is [width, height, depth]
     //onChange is a callback that gets called anytime a box gets edited
-    function BoxEditor (canvas, wgl, projectionMatrix, camera, gridSize, onLoaded, onChange) {
+    //getBackgroundBrightness is an optional function returning 0-1 (default 1)
+    function BoxEditor (canvas, wgl, projectionMatrix, camera, gridSize, onLoaded, onChange, getBackgroundBrightness) {
         this.canvas = canvas;
 
         this.wgl = wgl;
+        this.getBackgroundBrightness = getBackgroundBrightness || function () { return 1.0; };
 
         this.gridWidth = gridSize[0];
         this.gridHeight = gridSize[1];
@@ -251,55 +253,10 @@ var BoxEditor = (function () {
 
         //there's one grid vertex buffer for the planes normal to each axis 
         this.gridVertexBuffers = [];
-
         for (var axis = 0; axis < 3; ++axis) {
             this.gridVertexBuffers[axis] = wgl.createBuffer();
-
-            var vertexData = [];
-            
-
-            var points; //the points that make up this grid plane
-
-            if (axis === 0) {
-
-                points = [
-                    [0, 0, 0],
-                    [0, this.gridHeight, 0],
-                    [0, this.gridHeight, this.gridDepth],
-                    [0, 0, this.gridDepth]
-                ];
-
-            } else if (axis === 1) {
-                points = [
-                    [0, 0, 0],
-                    [this.gridWidth, 0, 0],
-                    [this.gridWidth, 0, this.gridDepth],
-                    [0, 0, this.gridDepth]
-                ];
-            } else if (axis === 2) {
-
-                points = [
-                    [0, 0, 0],
-                    [this.gridWidth, 0, 0],
-                    [this.gridWidth, this.gridHeight, 0],
-                    [0, this.gridHeight, 0]
-                ];
-            }
-
-
-            for (var i = 0; i < 4; ++i) {
-                vertexData.push(points[i][0]);
-                vertexData.push(points[i][1]);
-                vertexData.push(points[i][2]);
-
-                vertexData.push(points[(i + 1) % 4][0]);
-                vertexData.push(points[(i + 1) % 4][1]);
-                vertexData.push(points[(i + 1) % 4][2]);
-            }
-            
-
-            wgl.bufferData(this.gridVertexBuffers[axis], wgl.ARRAY_BUFFER, new Float32Array(vertexData), wgl.STATIC_DRAW);
         }
+        this._rebuildGridBuffers();
 
         this.pointVertexBuffer = wgl.createBuffer();
         wgl.bufferData(this.pointVertexBuffer, wgl.ARRAY_BUFFER, new Float32Array([-1.0, -1.0, 0.0, -1.0, 1.0, 0.0, 1.0, -1.0, 0.0, 1.0, 1.0, 0.0]), wgl.STATIC_DRAW);
@@ -414,6 +371,53 @@ var BoxEditor = (function () {
         return v;
     }
 
+    BoxEditor.prototype._rebuildGridBuffers = function () {
+        var wgl = this.wgl;
+        for (var axis = 0; axis < 3; ++axis) {
+            var vertexData = [];
+            var points;
+            if (axis === 0) {
+                points = [[0, 0, 0], [0, this.gridHeight, 0], [0, this.gridHeight, this.gridDepth], [0, 0, this.gridDepth]];
+            } else if (axis === 1) {
+                points = [[0, 0, 0], [this.gridWidth, 0, 0], [this.gridWidth, 0, this.gridDepth], [0, 0, this.gridDepth]];
+            } else {
+                points = [[0, 0, 0], [this.gridWidth, 0, 0], [this.gridWidth, this.gridHeight, 0], [0, this.gridHeight, 0]];
+            }
+            for (var i = 0; i < 4; ++i) {
+                vertexData.push(points[i][0], points[i][1], points[i][2], points[(i + 1) % 4][0], points[(i + 1) % 4][1], points[(i + 1) % 4][2]);
+            }
+            wgl.bufferData(this.gridVertexBuffers[axis], wgl.ARRAY_BUFFER, new Float32Array(vertexData), wgl.STATIC_DRAW);
+        }
+    };
+
+    BoxEditor.prototype.setGridSize = function (w, h, d) {
+        this.gridWidth = w;
+        this.gridHeight = h;
+        this.gridDepth = d;
+        this.gridDimensions = [w, h, d];
+        this._rebuildGridBuffers();
+        var eps = 0.001;
+        for (var i = 0; i < this.boxes.length; ++i) {
+            var b = this.boxes[i];
+            for (var a = 0; a < 3; ++a) {
+                b.min[a] = Math.max(0, Math.min(b.min[a], this.gridDimensions[a] - eps));
+                b.max[a] = Math.max(b.min[a] + eps, Math.min(this.gridDimensions[a], b.max[a]));
+            }
+        }
+        if (this.onChange) this.onChange();
+    };
+
+    BoxEditor.prototype.clampBoxesToGrid = function () {
+        var eps = 0.001;
+        for (var i = 0; i < this.boxes.length; ++i) {
+            var b = this.boxes[i];
+            for (var a = 0; a < 3; ++a) {
+                b.min[a] = Math.max(0, Math.min(b.min[a], this.gridDimensions[a] - eps));
+                b.max[a] = Math.max(b.min[a] + eps, Math.min(this.gridDimensions[a], b.max[a]));
+            }
+        }
+    };
+
     BoxEditor.prototype.onKeyDown = function (event) {
         this.keyPressed[event.keyCode] = true;
     }
@@ -424,6 +428,7 @@ var BoxEditor = (function () {
 
     BoxEditor.prototype.onMouseMove = function (event) {
         event.preventDefault();
+
 
         var position = Utilities.getMousePosition(event, this.canvas);
         var normalizedX = position.x / this.canvas.width;
@@ -715,9 +720,20 @@ var BoxEditor = (function () {
     BoxEditor.prototype.onMouseDown = function (event) {
         event.preventDefault();
 
+        if (event.button === 1) {
+            this.camera.onMouseDown(event);
+            return;
+        }
+
         this.onMouseMove(event);
 
         if (!this.keyPressed[32]) { //if space isn't held down
+
+            // Disable all box editing when in free camera mode
+            if (this.camera.freeCamMode) {
+                this.camera.onMouseDown(event);
+                return;
+            }
 
             //we've finished extruding a box
             if (this.interactionState !== null && this.interactionState.mode === InteractionMode.EXTRUDING) {
@@ -741,6 +757,12 @@ var BoxEditor = (function () {
 
                 //if we've intersected at least one box then let's start manipulating that box
                 if (boxIntersection !== null) {
+                    // Disable box manipulation when in free camera mode
+                    if (this.camera.freeCamMode) {
+                        this.camera.onMouseDown(event);
+                        return;
+                    }
+                    
                     var intersection = boxIntersection;
 
                     if (this.keyPressed[16]) { //if we're holding shift we start to translate
@@ -769,6 +791,12 @@ var BoxEditor = (function () {
 
                 //if we've not intersected any box then let's see if we should start the box creation process
                 if (boxIntersection === null) {
+                    // Disable box creation when in free camera mode
+                    if (this.camera.freeCamMode) {
+                        this.camera.onMouseDown(event);
+                        return;
+                    }
+                    
                     var mouseRay = this.getMouseRay();
 
                     var planeIntersection = this.getBoundingPlaneIntersection(mouseRay.origin, mouseRay.direction);
@@ -808,6 +836,11 @@ var BoxEditor = (function () {
 
     BoxEditor.prototype.onMouseUp = function (event) {
         event.preventDefault();
+
+        if (event.button === 1) {
+            this.camera.onMouseUp(event);
+            return;
+        }
 
         if (this.interactionState !== null) {
             if (this.interactionState.mode === InteractionMode.RESIZING) { //the end of a resize
@@ -899,9 +932,10 @@ var BoxEditor = (function () {
 
     BoxEditor.prototype.draw = function () {
         var wgl = this.wgl;
+        var b = this.getBackgroundBrightness();
 
         wgl.clear(
-            wgl.createClearState().bindFramebuffer(null).clearColor(0.9, 0.9, 0.9, 1.0),
+            wgl.createClearState().bindFramebuffer(null).clearColor(b, b, b, 1.0),
             wgl.COLOR_BUFFER_BIT | wgl.DEPTH_BUFFER_BIT);
 
         /////////////////////////////////////////////
@@ -913,7 +947,9 @@ var BoxEditor = (function () {
 
             .useProgram(this.backgroundProgram)
 
-            .vertexAttribPointer(this.quadVertexBuffer, this.backgroundProgram.getAttribLocation('a_position'), 2, wgl.FLOAT, wgl.FALSE, 0, 0);
+            .vertexAttribPointer(this.quadVertexBuffer, this.backgroundProgram.getAttribLocation('a_position'), 2, wgl.FLOAT, wgl.FALSE, 0, 0)
+
+            .uniform1f('u_backgroundBrightness', b);
 
         wgl.drawArrays(backgroundDrawState, wgl.TRIANGLE_STRIP, 0, 4);
 
@@ -1006,7 +1042,8 @@ var BoxEditor = (function () {
 
 
             //if we're not over a box but hovering over a bounding plane, let's draw a indicator point
-            if (boxIntersection === null && !this.keyPressed[32]) {
+            // Don't show indicator in free camera mode
+            if (boxIntersection === null && !this.keyPressed[32] && !this.camera.freeCamMode) {
                 var planeIntersection = this.getBoundingPlaneIntersection(mouseRay.origin, mouseRay.direction);
 
                 if (planeIntersection !== null) {

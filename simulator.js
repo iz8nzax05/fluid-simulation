@@ -1,31 +1,55 @@
 'use strict'
 
+/**
+ * Simulator - FLIP/PIC fluid physics simulation
+ * 
+ * WHY FLIP/PIC: Combines Particle-In-Cell (PIC) stability with FLIP detail.
+ * - PIC: Particles transfer velocity to grid, grid solves pressure, particles get grid velocity
+ * - FLIP: Particles keep their own velocity, only get DIFFERENCE from grid (preserves detail)
+ * - flipness=0.99 means 99% FLIP (detail) + 1% PIC (stability) = best of both
+ * 
+ * WHY STAGGERED MAC GRID:
+ * - MAC = Marker-And-Cell (Harlow & Welch, 1965)
+ * - Staggered = velocities stored on cell FACES, not cell centers
+ * - WHY: Prevents pressure checkerboard artifacts (alternating high/low pressure)
+ * - Face-centered storage naturally enforces incompressibility at boundaries
+ * 
+ * GRID LAYOUT:
+ * - World space: [0, 0, 0] to [gridWidth, gridHeight, gridDepth] (world units)
+ * - Grid space: [0, 0, 0] to [gridResolutionX, gridResolutionY, gridResolutionZ] (cell indices)
+ * - Cell boundaries: integer values in grid space (simple!)
+ * 
+ * TEXTURE LAYOUT (WebGL limitation - no 3D textures):
+ * - 3D textures emulated as 2D: z-slices laid out along X axis
+ * - Velocity texture: [width*depth, height] where width = gridResolution+1 (staggered)
+ * - Scalar texture: [width*depth, height] where width = gridResolution
+ */
 var Simulator = (function () {
 
-    //simulation grid dimensions and resolution
-    //all particles are in the world position space ([0, 0, 0], [GRID_WIDTH, GRID_HEIGHT, GRID_DEPTH])
-
-    //when doing most grid operations, we transform positions from world position space into the grid position space ([0, 0, 0], [GRID_RESOLUTION_X, GRID_RESOLUTION_Y, GRID_RESOLUTION_Z])
-
-
-    //in grid space, cell boundaries are simply at integer values
-
-    //we emulate 3D textures with tiled 2d textures
-    //so the z slices of a 3d texture are laid out along the x axis
-    //the 2d dimensions of a 3d texture are therefore [width * depth, height]
-
-
     /*
-    we use a staggered MAC grid
-    this means the velocity grid width = grid width + 1 and velocity grid height = grid height + 1 and velocity grid depth = grid depth + 1
-    a scalar for cell [i, j, k] is positionally located at [i + 0.5, j + 0.5, k + 0.5]
-    x velocity for cell [i, j, k] is positionally located at [i, j + 0.5, k + 0.5]
-    y velocity for cell [i, j, k] is positionally located at [i + 0.5, j, k + 0.5]
-    z velocity for cell [i, j, k] is positionally located at [i + 0.5, j + 0.5, k]
-    */
+     * STAGGERED MAC GRID EXPLANATION:
+     * 
+     * WHY velocities on faces, not centers:
+     * - X-velocity at [i, j+0.5, k+0.5] = on face between cells [i,j,k] and [i+1,j,k]
+     * - Y-velocity at [i+0.5, j, k+0.5] = on face between cells [i,j,k] and [i,j+1,k]
+     * - Z-velocity at [i+0.5, j+0.5, k] = on face between cells [i,j,k] and [i,j,k+1]
+     * 
+     * WHY this matters:
+     * - Pressure gradient naturally computed as difference across face
+     * - Divergence calculation uses face velocities (no interpolation needed)
+     * - Boundary conditions simpler (velocity = 0 at wall faces)
+     * 
+     * Grid size: velocity grid is (resolution+1) in each dimension because we need
+     * one face velocity per cell edge. Example: 40 cells need 41 face velocities.
+     */
 
-    //the boundaries are the boundaries of the grid 
-    //a grid cell can either be fluid, air (these are tracked by markTexture) or is a wall (implicit by position)
+    // ============================================================================
+    // SECTION 1: CONSTANTS & GRID CONFIGURATION
+    // ============================================================================
+
+    // ============================================================================
+    // SECTION 2: CONSTRUCTOR & INITIALIZATION
+    // ============================================================================
 
     function Simulator (wgl, onLoaded) {
         this.wgl = wgl;
@@ -59,9 +83,21 @@ var Simulator = (function () {
         ///////////////////////////////////////////////////////
         // simulation parameters
 
+        // WHY 0.99 not 1.0: Pure FLIP (1.0) can be unstable with large timesteps.
+        // Small PIC component (0.01) adds damping that prevents explosion.
+        // 0.99 = 99% FLIP detail + 1% PIC stability = industry standard
         this.flipness = 0.99; //0 is full PIC, 1 is full FLIP
 
+        // WHY: Gravity in addforce.frag applies -40.0 * gravity * timeStep to Y velocity
+        // Negative values flip gravity (up), 0 = zero G, positive = normal down
+        this.gravity = 1.0; // 1=normal down, 0=zero G, negative=flip
 
+        // WHY: Multiplier for mouse force strength. Higher = stronger particle pushing
+        this.mouseStrength = 3.0; // Mouse interaction strength multiplier
+        this.mouseMode = 0; // 0=repel, 1=vortex, 2=attract
+        this.mousePosition = [0, 0, 0]; // Mouse position in world space
+
+        // WHY: Used for random motion in shaders (frameNumber % someValue for variation)
         this.frameNumber = 0; //used for motion randomness
 
         
@@ -104,6 +140,12 @@ var Simulator = (function () {
         /////////////////////////////
         // load programs
 
+
+        // ============================================================================
+        // SECTION 4: SHADER PROGRAM LOADING
+        // ============================================================================
+        // NOTE: Texture creation happens in reset() method (Section 5) when particle count is known.
+        // Textures are rebuilt each time reset() is called with new dimensions.
 
         wgl.createProgramsFromFiles({
             transferToGridProgram: {
@@ -175,6 +217,10 @@ var Simulator = (function () {
         }).bind(this));
     }
 
+
+    // ============================================================================
+    // SECTION 5: RESET & PARTICLE INITIALIZATION
+    // ============================================================================
 
     //expects an array of [x, y, z] particle positions
     //gridSize and gridResolution are both [x, y, z]
@@ -263,41 +309,58 @@ var Simulator = (function () {
 
     }
 
-    function swap (object, a, b) {
-        var temp = object[a];
-        object[a] = object[b];
-        object[b] = temp;
-    }
+    // ============================================================================
+    // SECTION 6: SIMULATION PIPELINE (simulate method)
+    // ============================================================================
 
-    //you need to call reset() with correct parameters before simulating
-    //mouseVelocity, mouseRayOrigin, mouseRayDirection are all expected to be arrays of 3 values
+    /**
+     * simulate() - Run one physics timestep
+     * 
+     * CRITICAL PIPELINE ORDER (DO NOT CHANGE):
+     * 1. Transfer particles → grid (splat particle velocities to staggered MAC grid)
+     * 2. Normalize grid (divide accumulated velocity by weights)
+     * 3. Mark fluid cells (which cells contain particles)
+     * 4. Add forces (gravity, mouse, future: jets, wind)
+     * 5. Enforce boundaries (zero velocity at walls, future: obstacles)
+     * 6. Compute divergence (for pressure solve)
+     * 7. Solve pressure (Jacobi iterations to make velocity divergence-free)
+     * 8. Subtract pressure gradient (apply pressure correction to velocity)
+     * 9. Transfer grid → particles (FLIP blend: particles get velocity difference)
+     * 10. Advect particles (move particles through velocity field using RK2)
+     * 
+     * WHY THIS ORDER:
+     * - Forces must be added BEFORE pressure solve (pressure corrects the forced velocity)
+     * - Boundaries must be enforced BEFORE divergence (divergence needs correct boundary conditions)
+     * - Pressure solve must happen BEFORE transferring to particles (particles need corrected velocity)
+     * - Advection must be LAST (particles move based on final corrected velocity)
+     * 
+     * Changing order = broken physics (particles explode, flow wrong direction, etc.)
+     */
     Simulator.prototype.simulate = function (timeStep, mouseVelocity, mouseRayOrigin, mouseRayDirection) {
+        // WHY: Early return if paused (timeStep = 0). Prevents unnecessary GPU work.
+        // NOTE: In simulatorrenderer.js, we ensure timeStep >= 1/600 when running
+        // so physics (gravity) always applies even when speed slider is at 0%
         if (timeStep === 0.0) return;
 
         this.frameNumber += 1;
 
         var wgl = this.wgl;
 
-        /*
-            the simulation process
-            transfer particle velocities to velocity grid
-            save this velocity grid
-
-            solve velocity grid for non divergence
-
-            update particle velocities with new velocity grid
-            advect particles through the grid velocity field
-        */
-
 
         //////////////////////////////////////////////////////
-        //transfer particle velocities to grid
-
-        //we transfer particle velocities to the grid in two steps
-        //in the first step, we accumulate weight * velocity into tempVelocityTexture and then weight into weightTexture
-        //in the second step: velocityTexture = tempVelocityTexture / weightTexture
-
-        //we accumulate into velocityWeightTexture and then divide into velocityTexture
+        // STEP 1: Transfer particle velocities to grid (PIC/FLIP splatting)
+        //
+        // WHY TWO-PASS SPLATTING:
+        // - Pass 1: Accumulate weights (how many particles contribute to each grid cell)
+        // - Pass 2: Accumulate weighted velocities (sum of velocity * weight)
+        // - Normalize: velocity = weightedSum / weightSum (average velocity per cell)
+        //
+        // WHY NOT ONE PASS: Can't divide during accumulation (GPU limitation).
+        // Must accumulate sums first, then divide in separate pass.
+        //
+        // WHY SPLAT DEPTH = 5: Each particle affects 5 Z-layers of grid cells.
+        // This creates smooth velocity field even with sparse particles.
+        // Too few = choppy, too many = expensive and blurry
 
         var transferToGridDrawState = wgl.createDrawState()
             .bindFramebuffer(this.simulationFramebuffer)
@@ -325,7 +388,9 @@ var Simulator = (function () {
 
         transferToGridDrawState.uniform1i('u_accumulate', 0)
 
-        //each particle gets splatted layer by layer from z - (SPLAT_SIZE - 1) / 2 to z + (SPLAT_SIZE - 1) / 2
+        // WHY 5 layers: Particles are 3D but grid is discrete. Splatting across 5 Z-layers
+        // ensures smooth velocity field. Each particle contributes to cells at:
+        // z-2, z-1, z, z+1, z+2 (centered on particle's Z position)
         var SPLAT_DEPTH = 5;
 
         for (var z = -(SPLAT_DEPTH - 1) / 2; z <= (SPLAT_DEPTH - 1) / 2; ++z) {
@@ -365,7 +430,12 @@ var Simulator = (function () {
 
 
         //////////////////////////////////////////////////////
-        // mark cells with fluid
+        // STEP 3: Mark cells with fluid
+        //
+        // WHY: Pressure solve only needs to run in cells that contain fluid.
+        // Air cells (no particles) should have zero pressure. This texture marks
+        // which cells are fluid (1) vs air (0) so pressure solver knows where to work.
+        // Future: Can extend to mark solid cells (obstacles) with different value.
 
         wgl.framebufferTexture2D(this.simulationFramebuffer, wgl.FRAMEBUFFER, wgl.COLOR_ATTACHMENT0, wgl.TEXTURE_2D, this.markerTexture, 0);
         wgl.clear(
@@ -386,7 +456,13 @@ var Simulator = (function () {
         wgl.drawArrays(markDrawState, wgl.POINTS, 0, this.particlesWidth * this.particlesHeight);
 
         ////////////////////////////////////////////////////
-        // save our original velocity grid
+        // STEP 4: Save original velocity grid (CRITICAL FOR FLIP)
+        //
+        // WHY: FLIP method needs the velocity BEFORE pressure correction.
+        // Later, we'll give particles the DIFFERENCE between new and old velocity.
+        // This preserves particle detail while still getting pressure stability.
+        // Formula: particleVelocity += (newGridVelocity - oldGridVelocity) * flipness
+        // Without saving original, we can't compute the difference.
 
         wgl.framebufferTexture2D(this.simulationFramebuffer, wgl.FRAMEBUFFER, wgl.COLOR_ATTACHMENT0, wgl.TEXTURE_2D, this.originalVelocityTexture, 0);
 
@@ -403,8 +479,16 @@ var Simulator = (function () {
 
 
         /////////////////////////////////////////////////////
-        // add forces to velocity grid
-
+        // STEP 5: Add forces to velocity grid
+        //
+        // WHY BEFORE PRESSURE SOLVE: Forces (gravity, mouse, future: jets/wind) modify
+        // velocity. Pressure solve then corrects this forced velocity to be incompressible.
+        // If we solved pressure first, forces would break incompressibility.
+        //
+        // Forces applied:
+        // - Gravity: -40.0 * gravity * timeStep in Y direction (addforce.frag)
+        // - Mouse: Velocity-based force at mouse position (repel/vortex/attract modes)
+        // Future: Jets (velocity sources), wind zones (directional force in AABB)
 
         wgl.framebufferTexture2D(this.simulationFramebuffer, wgl.FRAMEBUFFER, wgl.COLOR_ATTACHMENT0, wgl.TEXTURE_2D, this.tempVelocityTexture, 0);
 
@@ -418,6 +502,9 @@ var Simulator = (function () {
             .uniformTexture('u_velocityTexture', 0, wgl.TEXTURE_2D, this.velocityTexture)
 
             .uniform1f('u_timeStep', timeStep)
+            .uniform1f('u_gravity', typeof this.gravity === 'number' ? this.gravity : 1.0)
+            .uniform1f('u_mouseStrength', typeof this.mouseStrength === 'number' ? this.mouseStrength : 3.0)
+            .uniform1f('u_mouseMode', typeof this.mouseMode === 'number' ? this.mouseMode : 0.0)
 
             .uniform3f('u_mouseVelocity', mouseVelocity[0], mouseVelocity[1], mouseVelocity[2])
 
@@ -426,6 +513,7 @@ var Simulator = (function () {
 
             .uniform3f('u_mouseRayOrigin', mouseRayOrigin[0], mouseRayOrigin[1], mouseRayOrigin[2])
             .uniform3f('u_mouseRayDirection', mouseRayDirection[0], mouseRayDirection[1], mouseRayDirection[2])
+            .uniform3f('u_mousePosition', this.mousePosition[0], this.mousePosition[1], this.mousePosition[2])
 
 
         wgl.drawArrays(addForceDrawState, wgl.TRIANGLE_STRIP, 0, 4);
@@ -434,7 +522,14 @@ var Simulator = (function () {
 
         
         /////////////////////////////////////////////////////
-        // enforce boundary velocity conditions
+        // STEP 6: Enforce boundary velocity conditions
+        //
+        // WHY BEFORE DIVERGENCE: Boundaries must be set BEFORE computing divergence.
+        // Divergence calculation uses face velocities - if boundary faces have wrong
+        // velocity, divergence will be wrong, pressure solve will be wrong.
+        //
+        // Current: Zero velocity at walls (no-slip boundary condition)
+        // Future: Obstacles (spheres/boxes) will also set velocity = 0 at their faces
 
         wgl.framebufferTexture2D(this.simulationFramebuffer, wgl.FRAMEBUFFER, wgl.COLOR_ATTACHMENT0, wgl.TEXTURE_2D, this.tempVelocityTexture, 0);
 
@@ -454,10 +549,18 @@ var Simulator = (function () {
 
 
         /////////////////////////////////////////////////////
-        // update velocityTexture for non divergence
+        // STEP 7-9: Pressure projection (make velocity divergence-free)
+        //
+        // WHY: Incompressible fluid means div(velocity) = 0 everywhere.
+        // After adding forces, velocity field has divergence (fluid compresses/expands).
+        // Pressure projection corrects this by subtracting pressure gradient.
+        //
+        // Process:
+        // 7. Compute divergence (how much fluid is compressing/expanding per cell)
+        // 8. Solve pressure (Poisson equation: ∇²p = div(velocity))
+        // 9. Subtract pressure gradient (velocity -= ∇p, makes div(velocity) = 0)
 
-
-         //compute divergence for pressure projection
+         // STEP 7: Compute divergence for pressure projection
 
         var divergenceDrawState = wgl.createDrawState()
             
@@ -482,7 +585,16 @@ var Simulator = (function () {
         wgl.drawArrays(divergenceDrawState, wgl.TRIANGLE_STRIP, 0, 4);
         
         
-        //compute pressure via jacobi iteration
+        // STEP 8: Compute pressure via Jacobi iteration
+        //
+        // WHY JACOBI: Poisson equation (∇²p = div) is solved iteratively.
+        // Jacobi method: each cell's pressure = average of neighbors + divergence term.
+        // Iterate until pressure field converges (satisfies Poisson equation).
+        //
+        // WHY 50 ITERATIONS: Trade-off between accuracy and speed.
+        // More iterations = more accurate (closer to true incompressible), but slower.
+        // 50 is standard for real-time fluid - good enough visually, fast enough for 60fps.
+        // Too few (<20) = visible compression artifacts. Too many (>100) = unnecessary cost.
 
         var jacobiDrawState = wgl.createDrawState()
             .bindFramebuffer(this.simulationFramebuffer)
@@ -500,7 +612,6 @@ var Simulator = (function () {
         wgl.clear(
             wgl.createClearState().bindFramebuffer(this.simulationFramebuffer),
             wgl.COLOR_BUFFER_BIT);
-        
         var PRESSURE_JACOBI_ITERATIONS = 50;
         for (var i = 0; i < PRESSURE_JACOBI_ITERATIONS; ++i) {
             wgl.framebufferTexture2D(this.simulationFramebuffer, wgl.FRAMEBUFFER, wgl.COLOR_ATTACHMENT0, wgl.TEXTURE_2D, this.tempSimulationTexture, 0);
@@ -512,7 +623,13 @@ var Simulator = (function () {
         }
         
         
-        //subtract pressure gradient from velocity
+        // STEP 9: Subtract pressure gradient from velocity
+        //
+        // WHY: This is the pressure correction step. Pressure gradient points in direction
+        // that will cancel divergence. Subtracting it from velocity makes velocity
+        // divergence-free (incompressible). Formula: velocity -= ∇p
+        //
+        // After this step: div(velocity) ≈ 0 (fluid no longer compresses/expands)
 
         wgl.framebufferTexture2D(this.simulationFramebuffer, wgl.FRAMEBUFFER, wgl.COLOR_ATTACHMENT0, wgl.TEXTURE_2D, this.tempVelocityTexture, 0);
 
@@ -533,7 +650,17 @@ var Simulator = (function () {
         swap(this, 'velocityTexture', 'tempVelocityTexture');
 
         /////////////////////////////////////////////////////////////
-        // transfer velocities back to particles
+        // STEP 10: Transfer velocities back to particles (FLIP blend)
+        //
+        // WHY FLIP BLEND: Particles keep their own velocity detail, but get stability from grid.
+        // Formula: particleVelocity += (newGridVelocity - oldGridVelocity) * flipness
+        //
+        // - flipness = 0.99 means 99% of velocity change comes from grid (FLIP detail)
+        // - 1% comes from direct grid velocity (PIC stability)
+        // - This preserves particle turbulence while getting pressure correction benefits
+        //
+        // WHY NOT JUST SET particleVelocity = gridVelocity: That's pure PIC - loses all
+        // particle detail (turbulence, small-scale motion). FLIP preserves it.
 
         wgl.framebufferTexture2D(this.simulationFramebuffer, wgl.FRAMEBUFFER, wgl.COLOR_ATTACHMENT0, wgl.TEXTURE_2D, this.particleVelocityTextureTemp, 0);
 
@@ -558,8 +685,17 @@ var Simulator = (function () {
         swap(this, 'particleVelocityTextureTemp', 'particleVelocityTexture');
 
         ///////////////////////////////////////////////
-        // advect particle positions with velocity grid using RK2
-
+        // STEP 11: Advect particle positions with velocity grid using RK2
+        //
+        // WHY LAST: Particles must move AFTER getting their updated velocity.
+        // Order: update velocity → then move particles. Reversing = particles move with old velocity.
+        //
+        // WHY RK2 (Runge-Kutta 2nd order): More accurate than Euler (simple position += velocity * dt).
+        // RK2: Move halfway, sample velocity there, then move full step with that velocity.
+        // This reduces error when velocity field changes rapidly (curved flow paths).
+        // Euler would cause particles to "overshoot" in curved flows.
+        //
+        // Future: Can add obstacle push-out here (if particle inside obstacle, push it out)
 
         wgl.framebufferTexture2D(this.simulationFramebuffer, wgl.FRAMEBUFFER, wgl.COLOR_ATTACHMENT0, wgl.TEXTURE_2D, this.particlePositionTextureTemp, 0);
         wgl.clear(
@@ -585,6 +721,16 @@ var Simulator = (function () {
         wgl.drawArrays(advectDrawState, wgl.TRIANGLE_STRIP, 0, 4);
 
         swap(this, 'particlePositionTextureTemp', 'particlePositionTexture');
+    }
+
+    // ============================================================================
+    // SECTION 7: UTILITY FUNCTIONS
+    // ============================================================================
+
+    function swap (object, a, b) {
+        var temp = object[a];
+        object[a] = object[b];
+        object[b] = temp;
     }
 
     return Simulator;

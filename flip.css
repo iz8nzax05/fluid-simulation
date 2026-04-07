@@ -13,12 +13,18 @@ body {
     -ms-user-select: none;
 }
 
+#start-reset-row {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 15px;
+}
+
 #start-button {
     font-size: 16px;
     color: white;
     font-weight: bold;
-
-    margin-bottom: 15px;
 
     width: 120px;
     height: 40px;
@@ -27,6 +33,31 @@ body {
     text-align: center;
 
     pointer-events: auto;
+}
+
+#reset-button {
+    font-size: 16px;
+    color: white;
+    font-weight: bold;
+
+    width: 80px;
+    height: 40px;
+    line-height: 40px;
+
+    text-align: center;
+
+    pointer-events: auto;
+    cursor: pointer;
+
+    background: rgb(230, 140, 50);
+}
+
+#reset-button:hover {
+    background: rgb(220, 130, 40);
+}
+
+#reset-button:active {
+    background: rgb(210, 120, 30);
 }
 
 .start-button-active {
@@ -75,21 +106,162 @@ body {
     background: rgba(60, 140, 210, 1.0);
 }
 
+#color-preset-bar {
+    background: rgba(0, 0, 0, 1.0) !important;
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 16px;
+    background: rgba(0, 0, 0, 1.0);
+    pointer-events: auto;
+}
+
+.color-preset-label {
+    color: #aaaaaa;
+    font-size: 12px;
+    font-weight: bold;
+    margin-right: 4px;
+}
+
+.color-preset-btn {
+    padding: 4px 10px;
+    font-size: 11px;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    background: rgba(255, 255, 255, 0.08);
+    color: #eeeeee;
+    cursor: pointer;
+    border-radius: 4px;
+    font-family: 'Asap', Helvetica, Arial, sans-serif;
+}
+
+.color-preset-btn:hover {
+    background: rgba(255, 255, 255, 0.18);
+}
+
+.color-preset-btn.active {
+    background: rgba(80, 160, 230, 0.85);
+    border-color: rgba(255, 255, 255, 0.5);
+}
+
+.color-maker-wrapper {
+    position: relative;
+    display: inline-block;
+}
+
+#color-maker-tray {
+    position: absolute;
+    top: calc(100% + 19px);
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 10;
+    padding: 10px 12px;
+    background: rgba(0, 0, 0, 0.4);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    pointer-events: auto;
+}
+
+.color-maker-colors {
+    display: flex;
+    flex-direction: row;
+    gap: 16px;
+}
+
+.color-maker-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    align-items: flex-start;
+}
+
+#color-maker-tray input[type="color"] {
+    width: 44px;
+    height: 28px;
+    padding: 2px;
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    border-radius: 4px;
+    cursor: pointer;
+    background: transparent;
+}
+
+.color-maker-label {
+    color: #aaaaaa;
+    font-size: 11px;
+    font-weight: bold;
+}
+
+.color-maker-glow {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+}
+
+#color-maker-glow {
+    width: 80px;
+}
+
 #ui {
     position: absolute;
-
-    pointer-events: none;
-
+    z-index: 10;
+    pointer-events: auto;
     top: 30px;
     left: 30px;
 }
 
-#particle-count {
-    color: #777777;
+#particle-count,
+#fluidity-value,
+#room-size,
+#speed-value,
+#gravity-value,
+#sim-paused {
+    color: #aaaaaa;
 
     font-size: 12px;
 
     margin-top: 4px;
+}
+
+#gravity-value {
+    color: #aaaaaa !important;
+}
+
+.gravity-row {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 6px;
+    margin-top: 4px;
+}
+
+.gravity-row .slider {
+    margin-top: 0;
+}
+
+.gravity-zero-btn {
+    flex-shrink: 0;
+    padding: 2px 6px;
+    font-size: 10px;
+    font-weight: bold;
+    line-height: 1.2;
+    background: rgba(80, 80, 80, 0.9);
+    color: rgba(255, 255, 255, 0.9);
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    border-radius: 3px;
+    cursor: pointer;
+    pointer-events: auto;
+}
+
+.gravity-zero-btn:hover {
+    background: rgba(100, 100, 100, 0.95);
 }
 
 .slider-label {
@@ -101,6 +273,7 @@ body {
 }
 
 .slider {
+    position: relative;
     margin-top: 4px;
 
     width: 200px;
@@ -112,6 +285,8 @@ body {
     -ms-user-select: none;
 
     background: rgba(0, 0, 0, 0.1);
+
+    border: 1px solid rgba(255, 255, 255, 0.35);
 
     pointer-events: auto;
 }
@@ -126,6 +301,51 @@ body {
 
 .slider:hover div {
     background: #555555;
+}
+
+.effects-row {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+    margin-top: 4px;
+    pointer-events: auto;
+}
+
+.effects-row label.effect-option {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    color: #555555;
+    font-size: 12px;
+}
+
+.effect-checkbox {
+    width: 18px;
+    height: 18px;
+    margin: 0;
+    cursor: pointer;
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid rgba(255, 255, 255, 0.6);
+    border-radius: 3px;
+    background: rgba(0, 0, 0, 0.2);
+    box-sizing: border-box;
+}
+
+.effect-checkbox.checked {
+    background: rgb(70, 190, 60);
+    border-color: rgb(70, 190, 60);
+}
+
+.effect-checkbox.checked::after {
+    content: "✓";
+    color: white;
+    font-size: 12px;
+    font-weight: bold;
 }
 
 .instructions {
@@ -186,4 +406,221 @@ body {
 
 #linkback a {
     color: #333333;
+}
+
+#debug-menu {
+    position: fixed;
+    top: 50%;
+    right: 30px;
+    transform: translateY(-50%);
+    background: rgba(0, 0, 0, 0.85);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 6px;
+    padding: 12px 16px;
+    min-width: 200px;
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    color: #ffffff;
+    pointer-events: auto;
+    z-index: 99999;
+    display: none;
+}
+
+.debug-header {
+    font-weight: bold;
+    font-size: 13px;
+    color: #4CAF50;
+    margin-bottom: 8px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.debug-line {
+    margin: 4px 0;
+    line-height: 1.4;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.debug-label {
+    color: #aaaaaa;
+    margin-right: 8px;
+}
+
+.debug-separator {
+    height: 1px;
+    background: rgba(255, 255, 255, 0.2);
+    margin: 8px 0;
+}
+
+.debug-button {
+    width: 100%;
+    padding: 6px 12px;
+    margin-top: 4px;
+    background: rgba(80, 160, 230, 0.8);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 4px;
+    color: #ffffff;
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.debug-button:hover {
+    background: rgba(70, 150, 220, 0.9);
+}
+
+.debug-button:active {
+    background: rgba(60, 140, 210, 1.0);
+}
+
+/* Settings Menu */
+.settings-menu-button {
+    position: fixed;
+    top: 10px;
+    right: 20px;
+    width: 50px;
+    height: 50px;
+    background: rgba(40, 40, 40, 1.0);
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-radius: 8px;
+    cursor: pointer;
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s, border-color 0.2s;
+}
+
+.settings-menu-button:hover {
+    background: rgba(60, 60, 60, 1.0);
+    border-color: rgba(255, 255, 255, 0.5);
+}
+
+.settings-menu-button.active {
+    background: rgba(80, 80, 80, 1.0);
+    border-color: rgba(100, 150, 220, 0.8);
+}
+
+.hamburger-icon {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    width: 24px;
+    height: 18px;
+    position: relative;
+}
+
+.hamburger-icon span {
+    display: block;
+    width: 100%;
+    height: 3px;
+    background: rgba(255, 255, 255, 0.9);
+    border-radius: 2px;
+    transition: all 0.3s;
+}
+
+.settings-menu-button.active .hamburger-icon span:nth-child(1) {
+    transform-origin: left center;
+    transform: rotate(45deg) translate(8px, 8px) scaleX(0.88);
+}
+
+.settings-menu-button.active .hamburger-icon span:nth-child(2) {
+    opacity: 0;
+}
+
+.settings-menu-button.active .hamburger-icon span:nth-child(3) {
+    transform-origin: left center;
+    transform: rotate(-45deg) translate(8px, -8px) scaleX(0.88);
+}
+
+.settings-menu-tray {
+    position: fixed;
+    top: 70px;
+    right: 20px;
+    width: 320px;
+    height: 400px;
+    max-height: calc(100vh - 100px);
+    background: rgba(30, 30, 30, 1.0);
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    border-radius: 8px;
+    padding: 15px;
+    z-index: 999;
+    transform: translateX(400px);
+    transition: transform 0.3s ease;
+    overflow-y: auto;
+    overflow-x: hidden;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* IE and Edge */
+}
+
+.settings-menu-tray::-webkit-scrollbar {
+    display: none; /* Chrome, Safari, Opera */
+}
+
+.settings-menu-tray.open {
+    transform: translateX(0);
+}
+
+.settings-menu-header {
+    font-size: 18px;
+    font-weight: bold;
+    color: rgba(255, 255, 255, 0.95);
+    margin-bottom: 10px;
+    text-align: center;
+}
+
+.settings-separator {
+    height: 1px;
+    background: rgba(255, 255, 255, 0.2);
+    margin: 10px 0;
+}
+
+.settings-line {
+    display: flex;
+    align-items: center;
+    margin: 15px 0;
+    color: rgba(255, 255, 255, 0.9);
+    font-size: 14px;
+}
+
+.settings-label {
+    min-width: 120px;
+    margin-right: 10px;
+}
+
+.settings-line input[type="range"] {
+    flex: 1;
+    margin: 0 10px;
+}
+
+.settings-line span:last-child {
+    min-width: 40px;
+    text-align: right;
+    color: rgba(200, 200, 255, 0.9);
+    font-weight: bold;
+}
+
+.settings-checkbox-label {
+    color: rgba(255, 255, 255, 0.9);
+    font-size: 14px;
+    user-select: none;
+}
+
+#settings-custom-particles-panel {
+    padding-left: 10px;
+    border-left: 2px solid rgba(255, 255, 255, 0.1);
+    margin-left: 5px;
+}
+
+.settings-reset-btn:hover {
+    background: rgba(100, 100, 100, 1.0) !important;
+    border-color: rgba(255, 255, 255, 0.3) !important;
+}
+
+.settings-reset-btn:active {
+    background: rgba(70, 70, 70, 1.0) !important;
 }

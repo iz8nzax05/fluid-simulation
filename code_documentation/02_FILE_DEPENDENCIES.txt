@@ -1,0 +1,135 @@
+================================================================================
+FILE DEPENDENCIES & WHAT EACH FILE DOES
+================================================================================
+
+DEPENDENCY TREE (load order matters):
+-------------------------------------
+
+index.html
+  ├─ wrappedgl.js (no dependencies)
+  ├─ utilities.js (no dependencies)
+  ├─ camera.js (depends on: utilities.js)
+  ├─ boxeditor.js (depends on: wrappedgl.js, utilities.js, camera.js)
+  ├─ simulator.js (depends on: wrappedgl.js, utilities.js)
+  ├─ renderer.js (depends on: wrappedgl.js, utilities.js)
+  ├─ simulatorrenderer.js (depends on: renderer.js, simulator.js, camera.js, utilities.js)
+  ├─ slider.js (depends on: utilities.js)
+  └─ fluidparticles.js (depends on: ALL of the above)
+
+FILE DESCRIPTIONS:
+------------------
+
+1. wrappedgl.js
+   Purpose: WebGL state management wrapper
+   Key Features:
+     - Tracks WebGL state changes
+     - Manages draw states efficiently
+     - Handles shader program loading
+     - Provides clean API for WebGL operations
+   Critical Classes:
+     - WrappedGL: Main wrapper class
+     - WrappedProgram: Shader program wrapper
+     - DrawState: Encapsulates drawing state
+   Used By: BoxEditor, Simulator, Renderer
+
+2. utilities.js
+   Purpose: Math and vector utilities
+   Key Functions:
+     - Vector operations (add, subtract, multiply, normalize, dot, cross)
+     - Matrix operations (perspective, lookAt, orthographic, invert, premultiply)
+     - Mouse position utilities
+     - Clamp function
+   Used By: Camera, BoxEditor, Simulator, Renderer, SimulatorRenderer
+
+3. camera.js
+   Purpose: 3D camera controls (orbit and free camera)
+   Key Features:
+     - Orbit camera mode (default)
+     - Free camera mode (WASD movement)
+     - Mouse look controls
+     - View matrix calculation
+   Critical Methods:
+     - getViewMatrix(): Returns current view matrix
+     - getPosition(): Returns camera world position
+     - update(): Updates camera position (free cam movement)
+   Used By: BoxEditor, SimulatorRenderer, FluidParticles
+
+4. boxeditor.js
+   Purpose: 3D box editing interface
+   Key Features:
+     - Draw boxes on grid walls
+     - Resize boxes by dragging faces
+     - Translate boxes with Shift+drag
+     - Ray-AABB intersection for selection
+   Critical Classes:
+     - BoxEditor: Main editor class
+     - AABB: Axis-aligned bounding box
+   Used By: FluidParticles (only in EDITING state)
+
+5. simulator.js
+   Purpose: FLIP fluid simulation
+   Key Features:
+     - Particle-based fluid simulation
+     - Grid-based pressure solver
+     - Velocity transfer between particles and grid
+     - Boundary enforcement
+   Critical Methods:
+     - reset(): Initialize simulation with particles
+     - simulate(): Run one simulation step
+   Used By: SimulatorRenderer
+
+6. renderer.js
+   Purpose: 3D rendering pipeline
+   Key Features:
+     - Instanced sphere rendering for particles
+     - Shadow mapping
+     - Ambient occlusion
+     - Post-processing (FXAA, bloom, vignette, sparkle)
+     - Color presets
+   Critical Methods:
+     - reset(): Initialize renderer with particle count
+     - draw(): Render one frame
+   Used By: SimulatorRenderer
+
+7. simulatorrenderer.js
+   Purpose: Combines simulator and renderer
+   Key Features:
+     - Coordinates simulation and rendering
+     - Handles mouse interaction for particle pushing
+     - Manages simulation state
+   Critical Methods:
+     - reset(): Reset both simulator and renderer
+     - update(): Run simulation step and render
+   Used By: FluidParticles (only in SIMULATING state)
+
+8. slider.js
+   Purpose: UI slider component
+   Key Features:
+     - Visual slider with fill bar
+     - Mouse drag interaction
+     - Callback on value change
+   Used By: FluidParticles (for all UI sliders)
+
+9. fluidparticles.js
+   Purpose: Main application controller
+   Key Features:
+     - Manages application state (EDITING vs SIMULATING)
+     - Coordinates all components
+     - Handles UI updates
+     - Manages animation loop
+   Critical Methods:
+     - startSimulation(): Switch to SIMULATING state
+     - stopSimulation(): Switch to EDITING state
+     - resetSimulation(): Reset particles
+     - update(): Main update loop
+     - redrawUI(): Update UI elements
+
+CRITICAL NOTES:
+---------------
+- wrappedgl.js MUST load first (everything depends on it)
+- utilities.js MUST load before camera.js, boxeditor.js, etc.
+- BoxEditor and SimulatorRenderer load shaders ASYNCHRONOUSLY
+- FluidParticles waits for BOTH to finish loading before starting
+- Changing state (EDITING ↔ SIMULATING) doesn't reload shaders
+
+================================================================================

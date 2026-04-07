@@ -1,0 +1,162 @@
+================================================================================
+WHAT WOULD IT LOOK LIKE IF SHADERS WERE TURNED OFF?
+================================================================================
+
+RENDERING PIPELINE OVERVIEW:
+----------------------------
+The fluid particles use a multi-pass deferred rendering pipeline:
+
+1. SPHERE SHADER (sphere.frag)
+   → Renders particles as 3D spheres
+   → Outputs to texture: (normal.x, normal.y, speed, depth)
+   
+2. AMBIENT OCCLUSION SHADER (sphereao.frag)
+   → Calculates how much each particle is occluded by nearby particles
+   → Outputs occlusion values
+   
+3. SHADOW MAP SHADER (spheredepth.frag)
+   → Renders depth from light's perspective
+   → Used for shadow calculations
+   
+4. COMPOSITE SHADER (composite.frag)
+   → Combines everything: particles + occlusion + shadows
+   → Applies color ramp based on speed
+   → Applies lighting, glow, sparkle, bloom, vignette effects
+   
+5. FXAA SHADER (fxaa.frag)
+   → Anti-aliasing pass
+   → Smooths jagged edges
+   → Final output to screen
+
+================================================================================
+WHAT IF EACH SHADER WAS TURNED OFF?
+================================================================================
+
+IF SPHERE SHADER WAS OFF:
+-------------------------
+Result: NOTHING WOULD RENDER
+- No particles would be drawn at all
+- The rendering texture would be empty (cleared to -99999.0)
+- You'd see a black/empty screen
+- The composite shader would have nothing to composite
+
+IF AMBIENT OCCLUSION SHADER WAS OFF:
+-------------------------------------
+Result: PARTICLES WOULD LOOK FLAT AND UNREALISTIC
+- Particles would have no depth/volume perception
+- Everything would look evenly lit (no self-shadowing)
+- Particles would appear to float without depth cues
+- Still visible, but would look "flat" and less 3D
+
+IF SHADOW MAP SHADER WAS OFF:
+------------------------------
+Result: PARTICLES WOULD HAVE NO SHADOWS
+- No shadows cast by particles
+- Everything would be evenly lit from all angles
+- Would look less realistic
+- Still fully visible, just no shadow depth
+
+IF COMPOSITE SHADER WAS OFF:
+----------------------------
+Result: YOU'D SEE RAW DATA AS COLORS (NOT PRETTY!)
+
+The rendering texture stores:
+- R channel: normal.x (surface normal X component)
+- G channel: normal.y (surface normal Y component)  
+- B channel: speed (particle velocity magnitude)
+- A channel: depth (view space Z coordinate)
+
+If you saw this directly, it would look like:
+- WEIRD COLORED BLOBS representing normals
+  → Red/cyan areas = surfaces facing left/right
+  → Green/magenta areas = surfaces facing up/down
+  → Blue areas = fast-moving particles
+  → Dark areas = slow/stationary particles
+  → Alpha = depth information
+
+It would NOT look like particles - it would look like abstract colored data!
+Think of it like looking at a heat map or data visualization, not actual 3D spheres.
+
+IF FXAA SHADER WAS OFF:
+-----------------------
+Result: PARTICLES WOULD HAVE JAGGED EDGES
+- Everything would still render correctly
+- But edges would be pixelated/aliased
+- Would look less smooth and polished
+- Still fully functional, just less visually appealing
+
+================================================================================
+WHAT THE RAW DATA TEXTURE LOOKS LIKE:
+================================================================================
+
+The sphere shader outputs data in a special format:
+  gl_FragColor = vec4(normal.x, normal.y, speed, depth)
+
+If you could see this texture directly (before composite shader):
+
+VISUAL BREAKDOWN:
+----------------
+- RED CHANNEL (normal.x):
+  → Bright red = surface facing right (+X)
+  → Dark red/black = surface facing left (-X)
+  → Medium = facing forward/back
+  
+- GREEN CHANNEL (normal.y):
+  → Bright green = surface facing up (+Y)
+  → Dark green/black = surface facing down (-Y)
+  → Medium = horizontal surfaces
+  
+- BLUE CHANNEL (speed):
+  → Bright blue = fast-moving particles
+  → Dark blue/black = slow/stationary particles
+  → This is what drives the color ramp in composite shader
+  
+- ALPHA CHANNEL (depth):
+  → Bright = close to camera
+  → Dark = far from camera
+  → Used for depth calculations
+
+COMBINED APPEARANCE:
+--------------------
+The combined RGBA would create:
+- CYAN areas = particles facing camera with normals pointing up-right
+- MAGENTA areas = particles with normals pointing up-left
+- YELLOW areas = fast particles with specific normal orientations
+- BLUE areas = fast-moving particles (regardless of normal)
+- DARK areas = slow particles or empty space
+- BRIGHT areas = close particles
+- DIM areas = far particles
+
+It would look like abstract, colorful blobs - NOT like fluid particles!
+The composite shader is what transforms this data into beautiful, realistic fluid.
+
+================================================================================
+ANALOGY:
+================================================================================
+
+Think of it like this:
+- SPHERE SHADER = Taking a photo with a special camera that records data
+- COMPOSITE SHADER = Processing that photo to make it look beautiful
+- FXAA = Final touch-up to smooth edges
+
+If you turned off the composite shader, you'd see the "raw photo data" 
+(weird colors representing normals/speed/depth) instead of the final 
+beautiful image (realistic fluid particles).
+
+================================================================================
+TECHNICAL DETAILS:
+================================================================================
+
+The rendering texture format is documented in renderer.js line 26-30:
+  "we render in a deferred way to a special RGBA texture format
+   the format is (normal.x, normal.y, speed, depth)
+   the normal is normalized (thus z can be reconstructed with 
+   sqrt(1.0 - x * x - y * y))
+   the depth simply the z in view space"
+
+This is a DEFERRED RENDERING technique:
+- First pass: Store geometry data (normals, speed, depth)
+- Second pass: Use that data to calculate lighting, colors, effects
+- This allows complex lighting without rendering particles multiple times
+
+================================================================================

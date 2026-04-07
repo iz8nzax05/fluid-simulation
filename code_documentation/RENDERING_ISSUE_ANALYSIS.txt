@@ -1,0 +1,150 @@
+================================================================================
+ANALYSIS: What Caused the Rendering Issue (Room/Walls/Particles Not Showing)
+================================================================================
+
+Based on the documentation and code review, here's what likely caused the issue:
+
+CHANGES MADE THAT COULD BREAK RENDERING:
+-----------------------------------------
+
+1. **Color Preset Lookup Optimization (renderer.js)**
+   Location: Lines 172-181 (constructor), 305-323 (setColorMakerColors/Glow)
+   
+   RISK: HIGH
+   - Added cached `colorMakerPresetIndex` lookup
+   - If preset not found, index stays -1
+   - setColorMakerColors/Glow check `if (this.colorMakerPresetIndex >= 0)`
+   - BUT: If Color Maker preset doesn't exist or name doesn't match exactly,
+          the cached index would be -1 and these methods would silently fail
+   - This could break color rendering if Color Maker was the active preset
+   
+   VERIFICATION NEEDED:
+   - Check if COLOR_PRESETS array has a preset with name === 'Color Maker'
+   - Check if the name matching is case-sensitive
+   - Check if this was the active preset when issue occurred
+
+2. **Duplicate inverseViewMatrix Removal (renderer.js)**
+   Location: Line 552 (removed duplicate calculation)
+   
+   RISK: LOW (but verify)
+   - FXAA shader (fxaa.frag) does NOT use inverseViewMatrix
+   - Composite shader (composite.frag) DOES use it (line 47)
+   - Line 500 calculates it for composite shader (correct)
+   - Line 552 was calculating it again but NOT using it (safe to remove)
+   - HOWEVER: If we accidentally removed line 500 instead of 552, that would break rendering
+   
+   VERIFICATION NEEDED:
+   - Confirm line 500 still exists and calculates inverseViewMatrix
+   - Confirm line 521 still uses it for composite shader uniform
+   - Confirm line 552 was the one removed (not line 500)
+
+3. **WrappedGL Uniform Argument Changes (wrappedgl.js)**
+   Location: Lines 686-692
+   
+   RISK: MEDIUM
+   - Changed from array.concat() to loop-based push()
+   - Then reverted back to concat()
+   - If the revert wasn't complete or had a bug, uniforms might not be set correctly
+   - This would cause shaders to receive wrong/missing uniform values
+   
+   VERIFICATION NEEDED:
+   - Check current code matches original concat() pattern exactly
+   - Check if any syntax errors were introduced
+
+4. **FPS Tracking Changes (fluidparticles.js)**
+   Location: Lines 398-416
+   
+   RISK: LOW
+   - frameCount and frameTime are only used for FPS display
+   - Not used in any rendering logic
+   - Making them conditional shouldn't break rendering
+   - BUT: If we accidentally made something else conditional that shouldn't be...
+
+5. **Removed window.wgl Debug Code (fluidparticles.js)**
+   Location: Line 18
+   
+   RISK: VERY LOW
+   - This was just debug code exposing wgl to window object
+   - No functional impact on rendering
+
+6. **Removed cumulativeVolume (fluidparticles.js)**
+   Location: Lines 707-714
+   
+   RISK: VERY LOW
+   - Variable was calculated but never used
+   - Removal shouldn't affect anything
+
+CURRENT CODE STATE (After Revert):
+-----------------------------------
+After reverting and re-applying only "safe" fixes, the current code shows:
+- window.wgl = wgl; is STILL present (line 18) - not removed
+- inverseViewMatrix duplicate is STILL present (line 552) - not removed  
+- Color preset optimization was REVERTED (still uses linear search)
+- wrappedgl.js uses original concat() method (not optimized)
+
+This means ALL the potentially risky changes were reverted.
+
+MOST LIKELY CULPRIT (If Changes Had Been Applied):
+---------------------------------------------------
+Based on the symptoms (UI works, but no 3D rendering), if the changes had been applied,
+the issue would likely have been:
+
+**Scenario 1: Accidental Removal of Wrong inverseViewMatrix Line**
+- If we accidentally removed line 500 instead of line 552
+- Composite shader would receive undefined/null inverseViewMatrix
+- This would break shadow mapping and world space calculations
+- Result: Black screen or broken rendering
+
+**Scenario 2: Color Preset Lookup Bug**
+- If Color Maker preset wasn't found (name mismatch, case sensitivity)
+- Cached index would be -1
+- setColorMakerColors/Glow would silently fail
+- If Color Maker was active preset, color ramp wouldn't update
+- Result: Rendering might fail or show wrong colors
+
+ACTUAL ROOT CAUSE (Most Likely):
+---------------------------------
+**Browser Cache Issue** - The user reported that clearing browser cache fixed it.
+This is the MOST LIKELY cause because:
+
+1. Current code shows all risky changes were reverted
+2. User cleared 7 days of browser cache and it started working
+3. Symptoms match browser cache issues (UI works, rendering doesn't)
+4. Timing was coincidental with code changes
+
+What likely happened:
+- Browser cached old JavaScript files
+- Browser cached old shader files  
+- WebGL context had stale state
+- When new code loaded, it conflicted with cached resources
+- Clearing cache forced fresh load of all files
+
+This explains:
+- Why code changes didn't directly cause it (they were reverted anyway)
+- Why clearing cache fixed it
+- Why UI worked (HTML/CSS not cached the same way)
+- Why rendering failed (WebGL/shaders heavily cached)
+
+HOW TO PREVENT IN FUTURE:
+-------------------------
+1. Always test in incognito/private mode after making changes
+2. Clear browser cache before testing
+3. Check browser console for WebGL errors
+4. Verify shader compilation success
+5. Test with different color presets
+6. Add error checking to color preset lookup:
+   - Log warning if Color Maker preset not found
+   - Fallback to default preset if cached index is -1
+
+VERIFICATION CHECKLIST:
+-----------------------
+□ Check if Color Maker preset exists in COLOR_PRESETS array
+□ Verify colorMakerPresetIndex initialization logic
+□ Verify setColorMakerColors/Glow handle -1 index correctly
+□ Check renderer.js line 500 still calculates inverseViewMatrix
+□ Check renderer.js line 521 still uses inverseViewMatrix
+□ Verify wrappedgl.js uniform setting code matches original
+□ Test with all color presets to ensure none break rendering
+□ Check browser console for any WebGL errors when issue occurs
+
+================================================================================

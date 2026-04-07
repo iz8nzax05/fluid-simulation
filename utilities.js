@@ -35,6 +35,13 @@ var Utilities = {
         return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
     },
 
+    crossVectors: function (out, a, b) {
+        out[0] = a[1] * b[2] - a[2] * b[1];
+        out[1] = a[2] * b[0] - a[0] * b[2];
+        out[2] = a[0] * b[1] - a[1] * b[0];
+        return out;
+    },
+
     multiplyVectorByScalar: function (out, v, k) {
         out[0] = v[0] * k;
         out[1] = v[1] * k;

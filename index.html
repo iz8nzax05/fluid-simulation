@@ -23,9 +23,95 @@
             </style>
 
             <canvas id="canvas" width="1920" height="1080"></canvas>
+
+            <!-- Settings Menu -->
+            <div id="settings-menu-button" class="settings-menu-button">
+                <div class="hamburger-icon">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </div>
+            </div>
+            <div id="settings-menu-tray" class="settings-menu-tray">
+                <div class="settings-menu-header">Settings</div>
+                <div class="settings-separator"></div>
+                <div class="settings-line">
+                    <span class="settings-label">Mouse Strength:</span>
+                    <input type="range" id="settings-mouse-strength-slider" min="0.0" max="10.0" value="3.0" step="0.1" style="width: 150px; margin: 0 10px;">
+                    <span id="settings-mouse-strength-value">3.0</span>
+                </div>
+                <div class="settings-separator"></div>
+                <div class="settings-line">
+                    <span class="settings-label">Mouse Mode:</span>
+                    <select id="settings-mouse-mode-select" style="width: 180px; margin-left: 10px; padding: 4px; background: rgba(50, 50, 50, 1.0); color: rgba(255, 255, 255, 0.9); border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 4px;">
+                        <option value="0">Repel (Normal)</option>
+                        <option value="1">Vortex (Spin)</option>
+                        <option value="2">Attract (Pull)</option>
+                    </select>
+                </div>
+                <div class="settings-separator"></div>
+                <div class="settings-line">
+                    <label class="settings-checkbox-label" style="display: flex; align-items: center; cursor: pointer;">
+                        <input type="checkbox" id="settings-custom-particles-toggle" style="margin-right: 8px; width: 18px; height: 18px; cursor: pointer;">
+                        <span class="settings-label">Use Custom Particle Settings</span>
+                    </label>
+                </div>
+                <div id="settings-custom-particles-panel" style="display: none; margin-top: 10px;">
+                    <div class="settings-line" style="margin-bottom: 10px;">
+                        <button id="settings-reset-particles-btn" class="settings-reset-btn" style="width: 100%; padding: 6px; background: rgba(80, 80, 80, 1.0); color: rgba(255, 255, 255, 0.9); border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 4px; cursor: pointer; font-size: 12px;">Reset to Defaults</button>
+                    </div>
+                    <div class="settings-line">
+                        <span class="settings-label">Particle Spacing:</span>
+                        <input type="range" id="settings-particle-spacing-slider" min="0.1" max="2.0" value="0.5" step="0.05" style="width: 150px; margin: 0 10px;">
+                        <span id="settings-particle-spacing-value">0.5</span>
+                    </div>
+                    <div class="settings-line">
+                        <span class="settings-label">Particle Size:</span>
+                        <input type="range" id="settings-particle-size-slider" min="0.5" max="3.0" value="1.0" step="0.1" style="width: 150px; margin: 0 10px;">
+                        <span id="settings-particle-size-value">1.0</span>
+                    </div>
+                    <div class="settings-line">
+                        <span class="settings-label">Min Radius:</span>
+                        <input type="range" id="settings-particle-radius-min-slider" min="0.05" max="0.5" value="0.1" step="0.05" style="width: 150px; margin: 0 10px;">
+                        <span id="settings-particle-radius-min-value">0.1</span>
+                    </div>
+                    <div class="settings-line">
+                        <span class="settings-label">Max Radius:</span>
+                        <input type="range" id="settings-particle-radius-max-slider" min="0.1" max="1.0" value="0.3" step="0.05" style="width: 150px; margin: 0 10px;">
+                        <span id="settings-particle-radius-max-value">0.3</span>
+                    </div>
+                </div>
+                <div class="settings-separator"></div>
+            </div>
+
+            <div id="color-preset-bar" class="simulating-ui">
+                <span class="color-preset-label">Colors</span>
+            </div>
+
+            <div id="color-maker-tray" class="simulating-ui">
+                <div class="color-maker-colors">
+                    <div class="color-maker-item">
+                        <span class="color-maker-label">Color 1</span>
+                        <input type="color" id="color-maker-low" value="#3366cc" />
+                    </div>
+                    <div class="color-maker-item">
+                        <span class="color-maker-label">Color 2</span>
+                        <input type="color" id="color-maker-high" value="#cc99ff" />
+                    </div>
+                </div>
+                <div class="color-maker-glow">
+                    <span class="color-maker-label">Glow</span>
+                    <input type="range" id="color-maker-glow" min="0" max="1" step="0.01" value="0" />
+                </div>
+            </div>
             
             <div id="ui">
-                <div id="start-button">Start</div>
+                <div id="start-reset-row">
+                    <div id="start-button">Start</div>
+                    <div id="reset-button" class="simulating-ui">Reset</div>
+                </div>
+
+                <div id="sim-paused" class="simulating-ui"></div>
 
                 <div id="preset-button" class="editing-ui">Random Preset</div>
 
@@ -34,31 +120,91 @@
 
                 <div id="particle-count" class="editing-ui"></div>
 
+                <div class="slider-label editing-ui">Room Width</div>
+                <div id="room-width-slider" class="slider editing-ui"></div>
+
+                <div class="slider-label editing-ui">Room Height</div>
+                <div id="room-height-slider" class="slider editing-ui"></div>
+
+                <div class="slider-label editing-ui">Room Depth</div>
+                <div id="room-depth-slider" class="slider editing-ui"></div>
+
+                <div id="room-size" class="editing-ui"></div>
+
                 <div class="slider-label simulating-ui">Fluidity</div>
                 <div id="fluidity-slider" class="slider simulating-ui"></div>
+                <div id="fluidity-value" class="simulating-ui"></div>
 
                 <div class="slider-label simulating-ui">Speed</div>
                 <div id="speed-slider" class="slider simulating-ui"></div>
+                <div id="speed-value" class="simulating-ui"></div>
+
+                <div class="slider-label simulating-ui">Gravity</div>
+                <div class="gravity-row simulating-ui">
+                    <div id="gravity-slider" class="slider simulating-ui"></div>
+                    <button type="button" id="gravity-zero-btn" class="gravity-zero-btn simulating-ui" title="Set gravity to 0">0G</button>
+                </div>
+                <div id="gravity-value" class="simulating-ui"></div>
+
+                <div class="slider-label simulating-ui">Effects</div>
+                <div class="effects-row simulating-ui"><label class="effect-option"><span class="effect-checkbox" id="sparkle-cb" role="button" tabindex="0"></span><span class="effect-label">Sparkle</span></label><div id="sparkle-strength-slider" class="slider simulating-ui"></div></div>
+                <div class="effects-row simulating-ui"><label class="effect-option"><span class="effect-checkbox" id="vignette-cb" role="button" tabindex="0"></span><span class="effect-label">Vignette</span></label><div id="vignette-strength-slider" class="slider simulating-ui"></div></div>
+                <div class="effects-row simulating-ui"><label class="effect-option"><span class="effect-checkbox" id="bloom-cb" role="button" tabindex="0"></span><span class="effect-label">Bloom</span></label><div id="bloom-strength-slider" class="slider simulating-ui"></div></div>
+
+                <div class="slider-label">Background Color</div>
+                <div id="background-slider" class="slider"></div>
+                
+                <div class="effects-row"><label class="effect-option"><span class="effect-checkbox" id="free-cam-cb" role="button" tabindex="0"></span><span class="effect-label">Free Camera (WASD)</span></label></div>
             </div>
 
+            <div id="debug-menu" style="display: none;">
+                <div class="debug-header">Debug Info (F)</div>
+                <div class="debug-line"><span class="debug-label">FPS:</span> <span id="debug-fps">0</span></div>
+                <div class="debug-line"><span class="debug-label">Frame Time:</span> <span id="debug-frame-time">0</span> ms</div>
+                <div class="debug-line"><span class="debug-label">State:</span> <span id="debug-state">Editing</span></div>
+                <div class="debug-line"><span class="debug-label">Particles:</span> <span id="debug-particles">0</span></div>
+                <div class="debug-line"><span class="debug-label">Boxes:</span> <span id="debug-boxes">0</span></div>
+                <div class="debug-line"><span class="debug-label">Camera Mode:</span> <span id="debug-camera-mode">Orbit</span></div>
+                <div class="debug-line"><span class="debug-label">Camera Distance:</span> <span id="debug-camera-distance">0</span></div>
+                <div class="debug-line"><span class="debug-label">Camera Position:</span> <span id="debug-camera-position">0, 0, 0</span></div>
+                <div class="debug-line"><span class="debug-label">Canvas Size:</span> <span id="debug-canvas-size">0x0</span></div>
+                <div class="debug-separator"></div>
+                <div class="debug-line"><button id="debug-ui-toggle-btn" class="debug-button">Toggle UI (U)</button></div>
+                <div class="debug-line"><button id="debug-composite-toggle-btn" class="debug-button">Toggle Composite Shader</button></div>
+                <div class="debug-line"><button id="debug-occlusion-toggle-btn" class="debug-button">Toggle Ambient Occlusion</button></div>
+                <div class="debug-line"><button id="debug-shadow-toggle-btn" class="debug-button">Toggle Shadow Map</button></div>
+                <div class="debug-line"><button id="debug-2d-faces-toggle-btn" class="debug-button">Toggle 2D Faces</button></div>
+                <div class="debug-separator"></div>
+                <div class="debug-line">
+                    <span class="debug-label">Sphere Complexity:</span>
+                    <input type="range" id="debug-sphere-iterations-slider" min="0" max="7" value="7" step="1" style="width: 100px; margin: 0 10px; flex-shrink: 0;">
+                    <span id="debug-sphere-iterations-value" style="display: inline-block; min-width: 180px; text-align: right; flex-shrink: 0;">1280 faces (ico+3)</span>
+                </div>
+                <div class="debug-line">
+                    <span class="debug-label">Water Blend:</span>
+                    <input type="range" id="debug-water-blend-slider" min="0" max="5.0" value="1.5" step="0.1" style="width: 100px; margin: 0 10px; flex-shrink: 0;">
+                    <span id="debug-water-blend-value" style="display: inline-block; min-width: 50px; text-align: right; flex-shrink: 0;">1.5</span>
+                </div>
+            </div>
 
             <div class="instructions editing-ui">
-                <span>Space + drag</span> to rotate camera <br/>
+                <span>Drag</span> to orbit camera <br/>
                 <span>Scroll</span> to zoom in and out <br/>
+                <span>Free Camera</span> toggle for WASD movement <br/>
                 <br/>
+                <span>Room sliders</span> to set tank size <br/>
                 <span>Draw on walls</span> to create new boxes <br/>
                 <span>Drag box faces</span> to resize <br/>
                 <span>Shift + drag box faces</span> to translate <br/>
             </div>
 
             <div class="instructions simulating-ui">
-                <span>Drag</span> to rotate camera<br/>
+                <span>Space</span> to start or pause <br/>
+                <span>Drag</span> to orbit camera <br/>
+                <span>Free Camera</span> toggle for WASD movement <br/>
                 <span>Scroll</span> to zoom in and out <br/>
-                <span>Move mouse</span> to push particles
-            </div>
-
-            <div id="footer">
-               <a href="http://david.li">david.li</a> | <a href="https://youtu.be/DhNt_A3k4B4">Video</a> | <a href="https://github.com/dli/fluid">Code</a>  
+                <span>Move mouse</span> to push particles <br/>
+                <span>Sliders</span> for fluidity, speed · <span>Top bar</span> for colors
             </div>
         </script>
 

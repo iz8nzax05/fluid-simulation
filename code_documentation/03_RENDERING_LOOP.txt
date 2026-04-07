@@ -1,0 +1,130 @@
+================================================================================
+RENDERING LOOP & FRAME UPDATE SEQUENCE
+================================================================================
+
+MAIN ANIMATION LOOP:
+--------------------
+Location: fluidparticles.js line 395 (requestAnimationFrame)
+
+Every Frame Execution Order:
+----------------------------
+
+1. CALCULATE DELTA TIME
+   var deltaTime = currentTime - lastTime || 0;
+   lastTime = currentTime;
+
+2. FPS TRACKING (runs every frame)
+   - Increment frameCount (always)
+   - Store frameTime (always)
+   - Update frameTimeHistory (always, uses shift() - O(n) operation)
+   - Calculate FPS every second (always)
+   - Update debug info display (only if debugMenuVisible)
+
+3. CAMERA UPDATE
+   this.camera.update()
+   → Only does work if freeCamMode is enabled
+   → Updates orbitPoint based on WASD keys
+
+4. MAIN UPDATE
+   this.update(deltaTime)
+   
+   IF STATE == EDITING:
+     → this.boxEditor.draw()
+       → Clears screen
+       → Draws background quad
+       → Draws grid lines (6 planes, front-facing only)
+       → Determines highlights (if interacting/hovering)
+       → Draws point indicator (if hovering over grid wall, conditional)
+       → Draws boxes (solid)
+       → Draws boxes (wireframe)
+   
+   IF STATE == SIMULATING:
+     → this.simulatorRenderer.update(dt)
+       → Calculate mouse velocity for particle pushing
+       → this.simulator.simulate(dt, mouseVelocity, ...)
+         → Transfer particle velocities to grid
+         → Mark fluid cells
+         → Add forces (gravity, mouse)
+         → Enforce boundaries
+         → Solve pressure (Jacobi iterations)
+         → Transfer velocities back to particles
+         → Advect particles (RK2)
+       → this.renderer.draw(simulator, projectionMatrix, viewMatrix)
+         → Draw particles (instanced spheres)
+         → Draw occlusion
+         → Draw shadow map
+         → Composite everything
+         → Apply FXAA
+
+5. REQUEST NEXT FRAME
+   requestAnimationFrame(update)
+
+SIMULATION STEP DETAILS:
+------------------------
+Location: simulator.js line 275 (simulate method)
+
+Order of operations:
+1. Transfer particle velocities to grid
+   - Accumulate weights
+   - Accumulate weighted velocities
+   - Normalize to get grid velocity
+
+2. Mark fluid cells
+   - Splat particles to mark which cells contain fluid
+
+3. Save original velocity grid
+   - Needed for FLIP blending
+
+4. Add forces
+   - Gravity
+   - Mouse interaction (particle pushing)
+
+5. Enforce boundary conditions
+   - Set velocities to zero at walls
+
+6. Solve for pressure
+   - Calculate divergence
+   - Jacobi iterations (50 iterations)
+   - Subtract pressure gradient from velocity
+
+7. Transfer velocities back to particles
+   - Blend PIC and FLIP velocities based on flipness
+
+8. Advect particles
+   - Move particles through velocity field (RK2)
+
+RENDERING PIPELINE DETAILS:
+---------------------------
+Location: renderer.js line 350 (draw method)
+
+Order of operations:
+1. Draw particles to rendering texture
+   - Instanced sphere rendering
+   - Output: (normal.x, normal.y, speed, depth)
+
+2. Draw ambient occlusion
+   - Accumulate occlusion from nearby particles
+
+3. Draw shadow map
+   - Render from light's perspective
+   - Depth only
+
+4. Composite
+   - Combine rendering texture + occlusion + shadows
+   - Apply color ramp based on speed
+   - Apply post-processing effects (bloom, vignette, sparkle)
+
+5. Apply FXAA
+   - Anti-aliasing pass
+   - Final output to screen
+
+CRITICAL PERFORMANCE NOTES:
+---------------------------
+- Simulation runs every frame (unless frozen)
+- Rendering runs every frame
+- FPS tracking runs every frame (only display update is conditional)
+- Camera update only does work in free cam mode
+- All WebGL state changes are tracked and optimized by WrappedGL
+- frameTimeHistory.shift() is O(n) operation called every frame (performance issue)
+
+================================================================================

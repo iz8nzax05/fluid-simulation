@@ -1,0 +1,200 @@
+================================================================================
+TROUBLESHOOTING GUIDE - WHAT TO CHECK WHEN THINGS BREAK
+================================================================================
+
+SYMPTOM: Nothing renders (black screen, no UI)
+----------------------------------------------
+CHECK:
+  1. Browser console for JavaScript errors (F12)
+  2. WebGL support check passed (index.html line 176)
+  3. Shaders loaded successfully (check network tab)
+  4. start() function was called (check if UI buttons exist)
+  5. Animation loop started (check if update() is being called)
+  6. Browser cache cleared (Ctrl+Shift+Delete)
+
+COMMON CAUSES:
+  - Shader files not loading (404 errors)
+  - WebGL not supported
+  - JavaScript error stopping execution
+  - Browser cache serving old broken files
+
+SYMPTOM: UI shows but no 3D rendering
+-------------------------------------
+CHECK:
+  1. Canvas element exists and has size > 0
+  2. WebGL context created successfully
+  3. BoxEditor.draw() or SimulatorRenderer.update() being called
+  4. No WebGL errors in console
+  5. Shaders compiled without errors
+
+COMMON CAUSES:
+  - Canvas size is 0x0
+  - WebGL context lost
+  - Shader compilation errors
+  - Framebuffer errors
+
+SYMPTOM: Particles don't appear
+--------------------------------
+CHECK:
+  1. State is SIMULATING (not EDITING)
+  2. Boxes exist (this.boxEditor.boxes.length > 0)
+  3. Particles created in _resetSimulatorFromBoxes()
+  4. Simulator.reset() was called
+  5. Renderer.reset() was called
+  6. particlePositionTexture has data
+
+COMMON CAUSES:
+  - Started simulation with no boxes
+  - resetSimulatorFromBoxes() not called
+  - Particle count is 0
+  - Texture not initialized
+
+SYMPTOM: Can't create boxes
+---------------------------
+CHECK:
+  1. State is EDITING
+  2. freeCamMode is false (disables box editing)
+  3. Mouse events reaching boxEditor
+  4. getBoundingPlaneIntersection() finding planes
+  5. Camera not blocking mouse events
+
+COMMON CAUSES:
+  - Free camera mode enabled
+  - Camera dragging instead of box editing
+  - Mouse events not reaching boxEditor
+  - Grid dimensions invalid
+
+SYMPTOM: Simulation doesn't start
+----------------------------------
+CHECK:
+  1. Boxes exist (this.boxEditor.boxes.length > 0)
+  2. startButton click handler registered
+  3. startSimulation() method exists
+  4. State changes to SIMULATING
+  5. _resetSimulatorFromBoxes() completes
+
+COMMON CAUSES:
+  - No boxes created
+  - startSimulation() not called
+  - State not changing
+  - resetSimulatorFromBoxes() failing
+
+SYMPTOM: Performance issues (low FPS)
+--------------------------------------
+CHECK:
+  1. Particle count (more particles = slower)
+  2. Grid resolution (higher = slower)
+  3. Debug menu visible (adds overhead)
+  4. Post-processing effects enabled
+  5. Browser DevTools open (slows things down)
+
+COMMON CAUSES:
+  - Too many particles
+  - Grid resolution too high
+  - All effects enabled
+  - Browser throttling
+
+SYMPTOM: Colors not changing
+-----------------------------
+CHECK:
+  1. Color preset index updated
+  2. setColorPreset() called
+  3. updateColorRamp() called
+  4. colorRampTexture rebuilt
+  5. Composite shader using correct texture
+
+COMMON CAUSES:
+  - Color preset not set
+  - Texture not updated
+  - Shader uniform not set
+
+SYMPTOM: Camera not responding
+------------------------------
+CHECK:
+  1. Camera.update() being called
+  2. Mouse events reaching camera
+  3. freeCamMode state correct
+  4. Camera bounds not restricting movement
+  5. View matrix being recomputed
+
+COMMON CAUSES:
+  - Camera.update() not called
+  - Mouse events blocked
+  - Camera bounds too restrictive
+  - View matrix not updating
+
+DEBUGGING CHECKLIST:
+--------------------
+When something breaks, check in this order:
+
+1. Browser Console
+   → Look for JavaScript errors
+   → Look for WebGL errors
+   → Check if files loaded
+
+2. Network Tab
+   → Verify all files loaded (200 status)
+   → Check shader files loaded
+   → No 404 errors
+
+3. Code Execution
+   → Add console.log() at key points
+   → Verify functions are being called
+   → Check variable values
+
+4. WebGL State
+   → Check WebGL context exists
+   → Verify shaders compiled
+   → Check framebuffer status
+   → Look for WebGL errors
+
+5. State Management
+   → Verify state is correct (EDITING/SIMULATING)
+   → Check if components initialized
+   → Verify callbacks fired
+
+COMMON MISTAKES WHEN EDITING:
+------------------------------
+1. Breaking async loading order
+   → Don't change shader loading sequence
+   → Don't remove onLoaded callbacks
+
+2. Breaking state management
+   → Don't change State.EDITING/SIMULATING values
+   → Don't skip state checks
+
+3. Breaking initialization
+   → Don't remove component creation
+   → Don't change constructor parameters
+
+4. Breaking rendering loop
+   → Don't remove update() calls
+   → Don't break requestAnimationFrame chain
+
+5. Breaking event handlers
+   → Don't remove .bind(this)
+   → Don't change event registration order
+
+QUICK FIXES:
+------------
+Black screen:
+  → Clear browser cache
+  → Check console for errors
+  → Verify server is running
+
+No particles:
+  → Create boxes first
+  → Click Start button
+  → Check particle count in debug menu
+
+Camera stuck:
+  → Press U to toggle UI
+  → Check freeCamMode state
+  → Try resetting camera bounds
+
+Performance:
+  → Reduce particle density
+  → Disable post-processing
+  → Close debug menu
+
+================================================================================

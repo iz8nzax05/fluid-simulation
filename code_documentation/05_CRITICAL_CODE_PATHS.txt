@@ -1,0 +1,133 @@
+================================================================================
+CRITICAL CODE PATHS - WHAT CALLS WHAT
+================================================================================
+
+STARTING SIMULATION:
+--------------------
+User clicks "Start" button
+  → fluidparticles.js line 55: startButton click handler
+    → line 58: this.startSimulation()
+      → line 769: Set state to SIMULATING
+      → line 770: Set frozen = true
+      → line 772: Set simulator gravity
+      → line 773: this._resetSimulatorFromBoxes()
+        → line 725: _resetSimulatorFromBoxes() starts
+        → line 726: Calculate desired particle count (getParticleCount())
+        → line 727: Set particlesWidth = 512
+        → line 728: Calculate particlesHeight
+        → line 731: Create particlePositions array
+        → line 735: Calculate total volume of all boxes
+        → line 740: Generate particle positions from boxes
+        → line 754: Calculate grid resolution
+        → line 763: this.simulatorRenderer.reset(...)
+          → line 66: simulatorRenderer.reset()
+            → line 66: this.renderer.setGridDimensions()
+            → line 67: this.simulator.reset(...)
+            → line 68: this.renderer.reset(...)
+
+STOPPING SIMULATION:
+--------------------
+User clicks "Edit" button
+  → fluidparticles.js line 61: startButton click handler
+    → line 62: this.stopSimulation()
+      → line 786: Set state to EDITING
+      → line 789: Reset camera bounds
+
+RESETTING SIMULATION:
+---------------------
+User clicks "Reset" button OR presses R key
+  → fluidparticles.js line 68: resetButton click handler
+    → line 70: this.resetSimulation()
+      → line 778: this._resetSimulatorFromBoxes()
+      → line 780: Set frozen = true
+      → line 781: this.redrawUI()
+
+DRAWING A FRAME (EDITING MODE):
+--------------------------------
+Animation loop calls this.update()
+  → fluidparticles.js line 792: update()
+    → line 794: this.boxEditor.draw()
+      → boxeditor.js line 933: draw()
+        → line 937: Clear screen with background color
+        → line 944: Draw background quad (drawArrays at 954)
+        → line 960: Draw grid lines (6 planes, drawArrays at 987)
+        → line 1020: Determine highlights if interacting/hovering
+        → line 1046: Draw point indicator if hovering (drawArrays at 1076, conditional)
+        → line 996: Draw boxes (solid, drawElements at 1094)
+        → line 1099: Draw boxes (wireframe, drawElements at 1121)
+
+DRAWING A FRAME (SIMULATING MODE):
+-----------------------------------
+Animation loop calls this.update()
+  → fluidparticles.js line 792: update()
+    → line 796: this.simulatorRenderer.update(dt)
+      → simulatorrenderer.js line 71: update()
+        → line 112: this.simulator.simulate(...)
+          → simulator.js line 275: simulate()
+            → [See SIMULATION STEP DETAILS in 03_RENDERING_LOOP.txt]
+        → line 113: this.renderer.draw(...)
+          → renderer.js line 350: draw()
+            → [See RENDERING PIPELINE DETAILS in 03_RENDERING_LOOP.txt]
+
+CREATING A BOX:
+---------------
+User clicks on grid wall
+  → boxeditor.js line 720: onMouseDown()
+    → line 802: getBoundingPlaneIntersection()
+    → line 812: Create new AABB
+    → line 813: Push to this.boxes array
+    → line 815: Set interactionState to DRAWING mode
+    → line 824: Call onChange() callback
+      → fluidparticles.js line 38: redrawUI()
+
+User drags mouse
+  → boxeditor.js line 429: onMouseMove()
+    → line 567: InteractionState.mode == DRAWING
+      → line 582: Calculate intersection point
+      → line 590: Update box min/max
+      → line 635: Set box.min and box.max
+
+User releases mouse
+  → boxeditor.js line 837: onMouseUp()
+    → line 856: InteractionState.mode == DRAWING
+      → line 880: Set interactionState to EXTRUDING mode
+
+User clicks again
+  → boxeditor.js line 720: onMouseDown()
+    → line 739: InteractionState.mode == EXTRUDING
+      → line 741: Check if box has volume
+      → line 744: Set interactionState = null
+
+CHANGING GRID SIZE:
+-------------------
+User moves room size slider
+  → fluidparticles.js line 211: roomWidthSlider callback
+    → line 212: Update this.gridWidth
+    → line 213: this.boxEditor.setGridSize(...)
+      → boxeditor.js line 393: setGridSize()
+        → line 397: Update grid dimensions
+        → line 398: this._rebuildGridBuffers()
+        → line 399: Clamp all boxes to new grid
+        → line 407: Call onChange() callback
+
+CHANGING COLOR PRESET:
+----------------------
+User clicks color preset button
+  → fluidparticles.js line 136: Color preset button click
+    → line 137: Update this.colorPresetIndex
+    → line 138: this.simulatorRenderer.renderer.setColorPreset(idx)
+      → renderer.js line 300: setColorPreset()
+        → line 301: Update this.colorPresetIndex
+        → line 302: this.updateColorRamp(...)
+          → line 280: updateColorRamp()
+            → line 295: Rebuild colorRampTexture
+
+CRITICAL DEPENDENCIES:
+----------------------
+- startSimulation() REQUIRES boxes to exist
+- resetSimulatorFromBoxes() REQUIRES boxEditor to be initialized
+- draw() methods require shaders to be loaded
+- update() requires state to be set correctly
+- All UI updates call redrawUI() which updates DOM
+
+================================================================================

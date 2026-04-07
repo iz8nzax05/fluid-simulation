@@ -1,0 +1,114 @@
+================================================================================
+EVENT HANDLING FLOW
+================================================================================
+
+MOUSE EVENTS:
+-------------
+Registered in: fluidparticles.js lines 372-374
+
+onMouseMove:
+  → If EDITING: this.boxEditor.onMouseMove(event)
+    → Updates mouse position in clip space
+    → If interacting: Updates box being edited
+    → Updates camera if dragging
+  → If SIMULATING: this.simulatorRenderer.onMouseMove(event)
+    → Updates mouse position for particle pushing
+    → Updates camera if dragging
+
+onMouseDown:
+  → If EDITING: this.boxEditor.onMouseDown(event)
+    → Starts box creation/resize/translate
+    → Or starts camera drag
+  → If SIMULATING: this.simulatorRenderer.onMouseDown(event)
+    → Starts camera drag
+
+onMouseUp:
+  → If EDITING: this.boxEditor.onMouseUp(event)
+    → Ends box interaction
+    → Or ends camera drag
+  → If SIMULATING: this.simulatorRenderer.onMouseUp(event)
+    → Ends camera drag
+
+KEYBOARD EVENTS:
+----------------
+Registered in: fluidparticles.js lines 376-377
+
+onKeyDown:
+  → F key: Toggle debug menu
+  → U key: Toggle UI visibility
+  → R key: Reset simulation (if simulating)
+  → Space: Toggle freeze/pause (if simulating)
+  → Forward to boxEditor.onKeyDown (if editing)
+  → Forward to camera.onKeyDown (always)
+
+onKeyUp:
+  → Forward to boxEditor.onKeyUp (if editing)
+  → Forward to camera.onKeyUp (always)
+
+WINDOW EVENTS:
+--------------
+onResize:
+  → Updates canvas size
+  → Recalculates projection matrix
+  → Calls simulatorRenderer.onResize()
+    → Updates renderer textures
+
+UI BUTTON EVENTS:
+-----------------
+Start/Edit Button:
+  → If EDITING: startSimulation()
+  → If SIMULATING: stopSimulation()
+
+Reset Button:
+  → resetSimulation() (only if simulating)
+
+Preset Button:
+  → Loads next preset
+  → Clears current boxes
+  → Adds preset boxes
+
+Color Preset Buttons:
+  → Changes color preset
+  → Updates color ramp texture
+  → Shows/hides color maker tray
+
+SLIDER EVENTS:
+--------------
+All sliders call their changeCallback when value changes:
+  - Density slider: Updates gridCellDensity
+  - Room size sliders: Updates grid dimensions
+  - Fluidity slider: Updates simulator.flipness
+  - Speed slider: Updates timeStep
+  - Gravity slider: Updates simulator.gravity
+  - Effect strength sliders: Update renderer properties
+  - Background slider: Updates backgroundBrightness
+
+All sliders call redrawUI() after change.
+
+CAMERA EVENTS:
+--------------
+Wheel (scroll):
+  → Updates camera distance
+  → Recomputes view matrix
+
+Mouse drag (orbit mode):
+  → Updates azimuth and elevation
+  → Recomputes view matrix
+
+Mouse drag (free cam mode):
+  → Updates azimuth and elevation via pointer lock
+  → Recomputes view matrix
+
+WASD keys (free cam mode only):
+  → Updates orbitPoint position
+  → Recomputes view matrix
+
+CRITICAL NOTES:
+---------------
+- Mouse events are prevented from default behavior
+- Camera and box editor share mouse events (camera gets them if not editing box)
+- Free cam mode disables box editing
+- Event handlers use .bind(this) to maintain context
+- Some events check state before processing
+
+================================================================================
