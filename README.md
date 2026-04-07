@@ -1,6 +1,6 @@
 # WebGL Fluid Simulation
 
-Real-time 3D fluid simulation running entirely in the browser using WebGL. Based on the FLIP/PIC (Fluid-Implicit-Particle) method — the same technique used in professional VFX production (Pixar, Disney).
+Real-time 3D fluid simulation running entirely in the browser using WebGL. Based on the FLIP/PIC (Fluid-Implicit-Particle) method — a hybrid particle/grid technique used in high-end fluid simulation.
 
 ---
 
