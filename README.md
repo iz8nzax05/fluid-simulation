@@ -66,7 +66,6 @@ My additions (~1,900 lines added, files nearly doubled in size):
 - **Renderer expansion** — Added deferred rendering pipeline documentation, shadow map tuning, post-processing parameter controls
 - **fluidparticles.js rewrite** — Expanded from 377 → 1,409 lines: full state machine (EDITING/SIMULATING), async initialization order, UI event handlers, presets system, comprehensive inline documentation explaining every architectural decision
 - **5 new shaders** — billboard rendering (`billboard2d.frag/vert`, `billboard2dao.vert`, `billboard2ddepth.vert`), gbuffer view (`gbuffer_view.frag`)
-- **Addons system** — `/addons` folder with extended functionality
 - **11 documentation files** — Full code documentation in `/code_documentation` covering initialization order, rendering loop, critical code paths, bottleneck analysis, troubleshooting guide
 
 ---
